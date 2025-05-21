@@ -1,0 +1,4 @@
+pillow
+opencv-python
+# dlib (opcional)
+# face_recognition (opcional)
