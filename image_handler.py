@@ -1,3 +1,4 @@
+# Logica modular para el manejo de imagenes
 from PIL import Image, ImageTk
 import cv2
 
