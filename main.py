@@ -2,12 +2,15 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 from camera_handler import CameraHandler
-from image_handler import convert_cv_to_tk
+from imagen_handler import ImageHandler
+from imagen import convert_cv_to_tk
 from database_manager import DatabaseManager
 import cv2
 import face_recognition
 import numpy as np
 from PIL import Image, ImageTk
+import subprocess  
+import os
 
 class App:
     def __init__(self, root):
@@ -17,6 +20,7 @@ class App:
         self.root.configure(bg="#eaf6fb")
 
         self.camera = CameraHandler()
+        self.imagen = ImageHandler()
         self.db = DatabaseManager()
         self.frame = None
         self.face_detection_active = False
@@ -26,9 +30,14 @@ class App:
         self.known_names = []
         self.known_ids = []
 
+        self.imagen_mostrada = None  # Nueva variable para imagen cargada
+        self.imagen_reconocida = None  # Para guardar la imagen con resultados
+        
         self.cargar_rostros_conocidos()
         self.create_widgets()
         self.update_loop()
+        
+        
 
     def create_widgets(self):
         # Título grande
@@ -98,6 +107,55 @@ class App:
         self.video_label = tk.Label(self.root, bg="#222", width=800, height=480)
         self.video_label.pack(pady=10, fill=tk.BOTH, expand=True)
 
+    def open_image(self):
+        if self.imagen_mostrada is not None:
+            # Si ya hay imagen, desmontar (cerrar)
+            self.imagen_mostrada = None
+            self.imagen_reconocida = None
+            self.btn_open_image.config(text="Abrir Imagen")
+            self.info_label.config(text="Imagen desmontada. Puedes abrir otra imagen o activar la cámara.")
+            return
+        file_path = None
+        #Si es linux usar zenity
+        if os.name == 'posix':
+            try:
+                result = subprocess.run(
+                    ['zenity', '--file-selection'],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                file_path = result.stdout.strip()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo abrir el selector de archivos: {e}")
+        else:
+            file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+        if file_path:
+            img = cv2.imread(file_path)
+            if img is not None:
+                self.imagen_mostrada = img.copy()
+                self.btn_open_image.config(text="Cerrar Imagen")
+                self.info_label.config(text="Imagen cargada. Puedes desmontarla o activar la cámara.")
+                # Realizar reconocimiento facial sobre la imagen cargada
+                img_resultado = img.copy()
+                if self.known_encodings:
+                    recognitions = self.camera.recognize_faces_in_frame(img_resultado)
+                    img_resultado = self.camera.draw_recognition_results(img_resultado, recognitions)
+                else:
+                    face_locations = self.camera.detect_faces_in_frame(img_resultado)
+                    img_resultado = self.camera.draw_face_rectangles(img_resultado, face_locations)
+                self.imagen_reconocida = img_resultado  # Guarda la imagen con resultados
+
+                # Mostrar la imagen con resultados en el área de video
+                label_width = self.video_label.winfo_width()
+                label_height = self.video_label.winfo_height()
+                if label_width < 10 or label_height < 10:
+                    label_width, label_height = 640, 480
+                img_tk = convert_cv_to_tk(img_resultado, width=label_width, height=label_height)
+                self.video_label.configure(image=img_tk)
+                self.video_label.image = img_tk
+            else:
+                messagebox.showerror("Error", "No se pudo cargar la imagen")
+
+    
     def start_camera(self):
         if self.camera.start_camera():
             self.update_loop()
@@ -114,8 +172,8 @@ class App:
         messagebox.showinfo("Información", "Cámara desactivada")
 
     def toggle_face_detection(self):
-        if not self.camera.is_active:
-            messagebox.showwarning("Advertencia", "Primero debes activar la cámara")
+        if not self.camera.is_active and self.imagen_mostrada is None:
+            messagebox.showwarning("Advertencia", "Primero debes activar la cámara o abrir una imagen")
             return
         
         self.face_detection_active = not self.face_detection_active
@@ -131,22 +189,32 @@ class App:
             self.info_label.config(text="Información: Detección facial desactivada")
 
     def open_image(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+        if self.imagen_mostrada is not None:
+            # Si ya hay imagen, desmontar (cerrar)
+            self.imagen_mostrada = None
+            self.imagen_reconocida = None
+            self.btn_open_image.config(text="Abrir Imagen", bg="#2196F3")
+            self.info_label.config(text="Imagen desmontada. Puedes abrir otra imagen o activar la cámara.")
+            return
+        file_path = None
+        #Si es linux usar zenity
+        if os.name == 'posix':
+            try:
+                result = subprocess.run(
+                    ['zenity', '--file-selection'],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                file_path = result.stdout.strip()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo abrir el selector de archivos: {e}")
+        else:
+            file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
         if file_path:
             img = cv2.imread(file_path)
             if img is not None:
-                # Obtener dimensiones del contenedor
-                label_width = self.video_label.winfo_width()
-                label_height = self.video_label.winfo_height()
-                
-                # Valores por defecto en caso de que tkinter aún no haya calculado tamaño
-                if label_width < 10 or label_height < 10:
-                    label_width, label_height = 640, 480
-                
-                # Convertir y redimensionar la imagen manteniendo la relación de aspecto
-                img_tk = convert_cv_to_tk(img, width=label_width, height=label_height)
-                self.video_label.configure(image=img_tk)
-                self.video_label.image = img_tk
+                self.imagen_mostrada = img.copy()
+                self.btn_open_image.config(text="Cerrar Imagen", bg="#b71c1c")
+                self.info_label.config(text="Imagen cargada. Puedes desmontarla o activar la cámara.")
             else:
                 messagebox.showerror("Error", "No se pudo cargar la imagen")
 
@@ -185,10 +253,19 @@ class App:
                     return  # Ya terminó, no sigue a cargar desde archivo
     
         # 2. Si no hay cámara o no se detectó rostro, cargar desde archivo
-        file_path = filedialog.askopenfilename(
-            title="Seleccionar imagen de rostro",
-            filetypes=[("Image files", "*.jpg *.jpeg *.png")]
-        )
+        file_path = None
+        #Si es linux usar zenity
+        if os.name == 'posix':
+            try:
+                result = subprocess.run(
+                    ['zenity', '--file-selection'],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                file_path = result.stdout.strip()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo abrir el selector de archivos: {e}")
+        else:
+            file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
         if not file_path:
             return
         try:
@@ -222,6 +299,7 @@ class App:
             
             # Pasar rostros conocidos a camera_handler
             self.camera.set_known_faces(encodings, names, ids)
+            self.imagen.set_known_faces(encodings, names, ids)
         
         except Exception as e:
             print(f"Error al cargar rostros conocidos: {e}")
@@ -230,32 +308,49 @@ class App:
             self.known_ids = []
 
     def update_loop(self):
+        label_width = self.video_label.winfo_width()
+        label_height = self.video_label.winfo_height()
+        if label_width < 10 or label_height < 10:
+            label_width, label_height = 640, 480
+    
         if self.camera.is_active:
             frame = self.camera.read_frame()
             if frame is not None:
-                label_width = self.video_label.winfo_width()
-                label_height = self.video_label.winfo_height()
-                if label_width < 10 or label_height < 10:
-                    label_width, label_height = 640, 480
-                try:
-                    img_tk = convert_cv_to_tk(frame, width=label_width, height=label_height)
-                    self.video_label.configure(image=img_tk)
-                    self.video_label.image = img_tk
-                except Exception as e:
-                    print(f"Error al convertir la imagen: {e}")
+                # Reconocimiento facial en cámara si está activo
+                if self.face_detection_active:
+                    if self.known_encodings:
+                        recognitions = self.camera.recognize_faces_in_frame(frame)
+                        frame = self.camera.draw_recognition_results(frame, recognitions)
+                    else:
+                        face_locations = self.camera.detect_faces_in_frame(frame)
+                        frame = self.camera.draw_face_rectangles(frame, face_locations)
+                img_tk = convert_cv_to_tk(frame, width=label_width, height=label_height)
+                self.video_label.configure(image=img_tk)
+                self.video_label.image = img_tk
+        elif self.imagen_mostrada is not None:
+            # Reconocimiento facial en imagen cargada (igual que en cámara)
+            img_resultado = self.imagen_mostrada.copy()
+            if self.face_detection_active:
+                if self.known_encodings:
+                    recognitions = self.imagen.recognize_faces_in_image(img_resultado)
+                    img_resultado = self.imagen.draw_recognition_results(img_resultado, recognitions)
+                else:
+                    face_locations = self.imagen.detect_faces_in_image(img_resultado)
+                    img_resultado = self.imagen.draw_face_rectangles(img_resultado, face_locations)
+                    img_resultado = self.camera.draw_face_rectangles(img_resultado, face_locations)
+            img_tk = convert_cv_to_tk(img_resultado, width=label_width, height=label_height)
+            self.video_label.configure(image=img_tk)
+            self.video_label.image = img_tk
+            self.imagen_reconocida = img_resultado  # Guarda la última imagen reconocida
         else:
             # Mostrar ruido sal y pimienta animado
-            label_width = self.video_label.winfo_width()
-            label_height = self.video_label.winfo_height()
-            if label_width < 10 or label_height < 10:
-                label_width, label_height = 640, 480
             ruido = self.generar_ruido_salpimienta(label_width, label_height)
             img_ruido = Image.fromarray(ruido)
             img_tk = ImageTk.PhotoImage(img_ruido)
             self.video_label.configure(image=img_tk)
             self.video_label.image = img_tk
     
-        self.root.after(120, self.update_loop)  # 80 ms para animación fluida (~12 FPS)
+        self.root.after(120, self.update_loop)
         
     def generar_ruido_salpimienta(self, width, height):
         # Genera una imagen de ruido blanco y negro (sal y pimienta)
