@@ -6,79 +6,97 @@ from image_handler import convert_cv_to_tk
 from database_manager import DatabaseManager
 import cv2
 import face_recognition
+import numpy as np
+from PIL import Image, ImageTk
 
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("Sistema de Reconocimiento Facial")
-        self.root.geometry("800x700")
+        self.root.title("Sistema de Acceso Empresarial")
+        self.root.geometry("900x750")
+        self.root.configure(bg="#eaf6fb")
 
         self.camera = CameraHandler()
         self.db = DatabaseManager()
         self.frame = None
-        self.face_detection_active = False  
-        
+        self.face_detection_active = False
+
         # Variables para rostros conocidos
         self.known_encodings = []
         self.known_names = []
         self.known_ids = []
-        
-        self.cargar_rostros_conocidos()
 
+        self.cargar_rostros_conocidos()
         self.create_widgets()
         self.update_loop()
 
     def create_widgets(self):
+        # Título grande
+        self.title_label = tk.Label(
+            self.root, text="Sistema de Acceso Empresarial",
+            font=("Segoe UI", 24, "bold"), bg="#eaf6fb", fg="#1a4d6b"
+        )
+        self.title_label.pack(pady=(20, 10))
+
         # Frame para botones principales
-        btn_frame = tk.Frame(self.root)
+        btn_frame = tk.Frame(self.root, bg="#eaf6fb")
         btn_frame.pack(pady=10)
 
-        self.btn_start = tk.Button(btn_frame, text="Activar Cámara", command=self.start_camera)
-        self.btn_start.pack(side=tk.LEFT, padx=10)
+        self.btn_start = tk.Button(
+            btn_frame, text="Activar Cámara", command=self.start_camera,
+            font=("Segoe UI", 11), bg="#4CAF50", fg="white", activebackground="#388e3c",
+            width=14, height=1, bd=0, cursor="hand2"
+        )
+        self.btn_start.pack(side=tk.LEFT, padx=8)
 
-        self.btn_stop = tk.Button(btn_frame, text="Desactivar Cámara", command=self.stop_camera)
-        self.btn_stop.pack(side=tk.LEFT, padx=10)
+        self.btn_stop = tk.Button(
+            btn_frame, text="Desactivar Cámara", command=self.stop_camera,
+            font=("Segoe UI", 11), bg="#f44336", fg="white", activebackground="#b71c1c",
+            width=14, height=1, bd=0, cursor="hand2"
+        )
+        self.btn_stop.pack(side=tk.LEFT, padx=8)
 
-        self.btn_open_image = tk.Button(btn_frame, text="Abrir Imagen", command=self.open_image)
-        self.btn_open_image.pack(side=tk.LEFT, padx=10)
+        self.btn_open_image = tk.Button(
+            btn_frame, text="Abrir Imagen", command=self.open_image,
+            font=("Segoe UI", 11), bg="#2196F3", fg="white", activebackground="#1565c0",
+            width=14, height=1, bd=0, cursor="hand2"
+        )
+        self.btn_open_image.pack(side=tk.LEFT, padx=8)
 
-        self.btn_cargar_rostro = tk.Button(btn_frame, text="Cargar Rostro Conocido", 
-                                         command=self.cargar_rostro_conocido, bg="lightgreen")
-        self.btn_cargar_rostro.pack(side=tk.LEFT, padx=10)
+        self.btn_cargar_rostro = tk.Button(
+            btn_frame, text="Cargar Rostro Conocido", command=self.cargar_rostro_conocido,
+            font=("Segoe UI", 11), bg="#ffb300", fg="#333", activebackground="#ff8f00",
+            width=18, height=1, bd=0, cursor="hand2"
+        )
+        self.btn_cargar_rostro.pack(side=tk.LEFT, padx=8)
 
         # Frame para funciones de detección facial
-        detection_frame = tk.Frame(self.root)
-        detection_frame.pack(pady=5)
+        detection_frame = tk.Frame(self.root, bg="#eaf6fb")
+        detection_frame.pack(pady=10)
 
         self.btn_toggle_detection = tk.Button(
-            detection_frame, 
-            text="Activar Detección Facial", 
-            command=self.toggle_face_detection,
-            bg="lightblue"
+            detection_frame, text="Activar Detección Facial", command=self.toggle_face_detection,
+            font=("Segoe UI", 11), bg="#00bcd4", fg="white", activebackground="#008ba3",
+            width=20, height=1, bd=0, cursor="hand2"
         )
-        self.btn_toggle_detection.pack(side=tk.LEFT, padx=10)
+        self.btn_toggle_detection.pack(side=tk.LEFT, padx=8)
 
-        # Etiqueta de estado
         self.status_label = tk.Label(
-            detection_frame, 
-            text="Estado: Detección facial desactivada", 
-            fg="red"
+            detection_frame, text="Estado: Detección facial desactivada",
+            font=("Segoe UI", 12, "bold"), bg="#eaf6fb", fg="#d32f2f"
         )
-        self.status_label.pack(side=tk.LEFT, padx=10)
+        self.status_label.pack(side=tk.LEFT, padx=8)
 
-        # Frame para mostrar información de detección
-        info_frame = tk.Frame(self.root)
-        info_frame.pack(pady=5)
-
+        # Info label
         self.info_label = tk.Label(
-            info_frame, 
-            text="Información: Activa la cámara y la detección facial para comenzar",
-            fg="blue"
+            self.root, text="Información: Activa la cámara y la detección facial para comenzar",
+            font=("Segoe UI", 12), bg="#eaf6fb", fg="#1976d2"
         )
-        self.info_label.pack()
+        self.info_label.pack(pady=(10, 5))
 
-        self.video_label = tk.Label(self.root)
-        self.video_label.pack(fill=tk.BOTH, expand=True)
+        # Video label
+        self.video_label = tk.Label(self.root, bg="#222", width=800, height=480)
+        self.video_label.pack(pady=10, fill=tk.BOTH, expand=True)
 
     def start_camera(self):
         if self.camera.start_camera():
@@ -194,6 +212,7 @@ class App:
         except Exception as e:
             messagebox.showerror("Error", f"Error al procesar la imagen: {e}")
 
+
     def cargar_rostros_conocidos(self):
         try:
             encodings, names, ids = self.db.obtener_encodings_conocidos()
@@ -216,20 +235,35 @@ class App:
             if frame is not None:
                 label_width = self.video_label.winfo_width()
                 label_height = self.video_label.winfo_height()
-
-                # Valores por defecto en caso de que tkinter aún no haya calculado tamaño
                 if label_width < 10 or label_height < 10:
                     label_width, label_height = 640, 480
-
                 try:
                     img_tk = convert_cv_to_tk(frame, width=label_width, height=label_height)
                     self.video_label.configure(image=img_tk)
                     self.video_label.image = img_tk
                 except Exception as e:
                     print(f"Error al convertir la imagen: {e}")
+        else:
+            # Mostrar ruido sal y pimienta animado
+            label_width = self.video_label.winfo_width()
+            label_height = self.video_label.winfo_height()
+            if label_width < 10 or label_height < 10:
+                label_width, label_height = 640, 480
+            ruido = self.generar_ruido_salpimienta(label_width, label_height)
+            img_ruido = Image.fromarray(ruido)
+            img_tk = ImageTk.PhotoImage(img_ruido)
+            self.video_label.configure(image=img_tk)
+            self.video_label.image = img_tk
+    
+        self.root.after(120, self.update_loop)  # 80 ms para animación fluida (~12 FPS)
+        
+    def generar_ruido_salpimienta(self, width, height):
+        # Genera una imagen de ruido blanco y negro (sal y pimienta)
+        ruido = np.random.choice([0, 255], (height, width, 1), p=[0.5, 0.5]).astype('uint8')
+        ruido = np.repeat(ruido, 3, axis=2)  # Convertir a RGB
+        return ruido
 
-        self.root.after(180, self.update_loop)  # 60 ms ≈ 16 fps (ajustable)
-
+    
 
 if __name__ == "__main__":
     root = tk.Tk()
