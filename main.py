@@ -350,7 +350,7 @@ class App:
             self.video_label.configure(image=img_tk)
             self.video_label.image = img_tk
     
-        self.root.after(120, self.update_loop)
+        self.root.after(180, self.update_loop)
         
     def generar_ruido_salpimienta(self, width, height):
         # Genera una imagen de ruido blanco y negro (sal y pimienta)
