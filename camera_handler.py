@@ -78,7 +78,7 @@ class CameraHandler:
 
                 if self.enable_face_detection:
                     # Procesar detección solo cada 3 frames para mejor rendimiento
-                    if self.frame_count % 6 == 0:
+                    if self.frame_count % 8 == 0:
                         if self.known_encodings:
                             # Si hay rostros conocidos, hacer reconocimiento
                             self.last_recognitions = self.recognize_faces_in_frame(frame)
@@ -153,23 +153,30 @@ class CameraHandler:
 
     def draw_recognition_results(self, frame, recognitions):
         for nombre, distancia, (top, right, bottom, left), persona_id in recognitions:
-            # Color del rectángulo según si es conocido o no
             if nombre == "Desconocido":
                 color = (0, 0, 255)  # Rojo para desconocidos
                 texto = "Desconocido"
+                acceso = "Acceso denegado"
+                # Convertir la región de la cara a blanco y negro
+                face_roi = frame[top:bottom, left:right]
+                if face_roi.size > 0:
+                    gray_face = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+                    gray_face = cv2.cvtColor(gray_face, cv2.COLOR_GRAY2BGR)
+                    frame[top:bottom, left:right] = gray_face
             else:
                 color = (0, 255, 0)  # Verde para conocidos
                 confianza = max(0, (1 - distancia) * 100)
                 texto = f"{nombre} ({confianza:.0f}%)"
-            
+                acceso = "Acceso permitido"
+    
             # Dibujar rectángulo
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-            
-            # Dibujar fondo para el texto
+            # Fondo para el texto principal
             cv2.rectangle(frame, (left, bottom - 35), (right, bottom), color, cv2.FILLED)
-            
-            # Dibujar texto
-            cv2.putText(frame, texto, (left + 6, bottom - 6), 
-                       cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
-        
+            # Texto principal (nombre o desconocido)
+            cv2.putText(frame, texto, (left + 6, bottom - 18), 
+                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
+            # Texto de acceso debajo del recuadro
+            cv2.putText(frame, acceso, (left, bottom + 25), 
+                        cv2.FONT_HERSHEY_DUPLEX, 0.7, color, 2)
         return frame

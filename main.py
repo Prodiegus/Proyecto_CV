@@ -133,46 +133,64 @@ class App:
                 messagebox.showerror("Error", "No se pudo cargar la imagen")
 
     def cargar_rostro_conocido(self):
-        # Seleccionar imagen
+        # 1. Intentar capturar rostro desde la cámara
+        if self.camera.is_active:
+            frame = self.camera.read_frame()
+            if frame is not None:
+                # Convertir de BGR a RGB para face_recognition
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                encodings = face_recognition.face_encodings(rgb_frame)
+                if len(encodings) == 0:
+                    resp = messagebox.askyesno(
+                        "No se detectó rostro",
+                        "No se detectó ningún rostro en la cámara.\n¿Quieres seleccionar una imagen desde archivo?"
+                    )
+                    if not resp:
+                        return
+                elif len(encodings) > 1:
+                    messagebox.showwarning("Advertencia", "Se detectaron múltiples rostros en la cámara. Se usará el primero.")
+                    encoding = encodings[0]
+                else:
+                    encoding = encodings[0]
+    
+                if len(encodings) >= 1:
+                    nombre = simpledialog.askstring("Nombre", "Ingresa el nombre de la persona:")
+                    if not nombre:
+                        return
+                    # Guardar en base de datos (sin imagen de referencia)
+                    persona_id = self.db.agregar_persona(nombre, encoding, None)
+                    if persona_id:
+                        self.cargar_rostros_conocidos()
+                        messagebox.showinfo("Éxito", f"Rostro de '{nombre}' guardado correctamente desde cámara")
+                    else:
+                        messagebox.showerror("Error", "No se pudo guardar el rostro en la base de datos")
+                    return  # Ya terminó, no sigue a cargar desde archivo
+    
+        # 2. Si no hay cámara o no se detectó rostro, cargar desde archivo
         file_path = filedialog.askopenfilename(
             title="Seleccionar imagen de rostro",
             filetypes=[("Image files", "*.jpg *.jpeg *.png")]
         )
-        
         if not file_path:
             return
-        
         try:
-            # Cargar imagen
             imagen = face_recognition.load_image_file(file_path)
-            
-            # Detectar rostros
             encodings = face_recognition.face_encodings(imagen)
-            
             if len(encodings) == 0:
                 messagebox.showerror("Error", "No se detectó ningún rostro en la imagen")
                 return
-            
             if len(encodings) > 1:
                 messagebox.showwarning("Advertencia", "Se detectaron múltiples rostros. Se usará el primero.")
-            
-            # Pedir nombre de la persona
             nombre = simpledialog.askstring("Nombre", "Ingresa el nombre de la persona:")
-            
             if not nombre:
                 return
-            
-            # Guardar en base de datos
             encoding = encodings[0]
             persona_id = self.db.agregar_persona(nombre, encoding, file_path)
-            
             if persona_id:
-                # Recargar rostros conocidos después de agregar uno nuevo
                 self.cargar_rostros_conocidos()
-                messagebox.showinfo("Éxito", f"Rostro de '{nombre}' guardado correctamente")
+                messagebox.showinfo("Éxito", f"Rostro de '{nombre}' guardado correctamente desde archivo")
             else:
                 messagebox.showerror("Error", "No se pudo guardar el rostro en la base de datos")
-                
         except Exception as e:
             messagebox.showerror("Error", f"Error al procesar la imagen: {e}")
 
@@ -210,7 +228,7 @@ class App:
                 except Exception as e:
                     print(f"Error al convertir la imagen: {e}")
 
-        self.root.after(60, self.update_loop)  # 60 ms ≈ 16 fps (ajustable)
+        self.root.after(180, self.update_loop)  # 60 ms ≈ 16 fps (ajustable)
 
 
 if __name__ == "__main__":
