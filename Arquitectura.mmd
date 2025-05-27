@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant Usuario
+    participant UI as Interfaz Tkinter
+    participant CameraHandler
+    participant ImageHandler
+    participant DB as DatabaseManager
+
+    Usuario->>UI: Click en "Cargar Rostro Conocido"
+    alt Cámara activa y rostro detectado
+        UI->>CameraHandler: Capturar frame y extraer encoding
+        CameraHandler-->>UI: Encoding de rostro
+        UI->>DB: Guardar encoding y nombre
+        DB-->>UI: Confirmación
+    else No cámara o sin rostro
+        UI->>UI: Abrir selector de archivos
+        UI->>ImageHandler: Cargar imagen y extraer encoding
+        ImageHandler-->>UI: Encoding de rostro
+        UI->>DB: Guardar encoding y nombre
+        DB-->>UI: Confirmación
+    end
