@@ -2,6 +2,8 @@
 import cv2
 import face_recognition
 import numpy as np
+import tkinter as tk
+from tkinter import simpledialog
 
 class CameraHandler:
     def __init__(self, camera_index=0):
@@ -180,3 +182,32 @@ class CameraHandler:
             cv2.putText(frame, acceso, (left, bottom + 25), 
                         cv2.FONT_HERSHEY_DUPLEX, 0.7, color, 2)
         return frame
+    
+    @staticmethod
+    def listar_camaras(max_camaras=5):
+        disponibles = []
+        for i in range(max_camaras):
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                disponibles.append(i)
+                cap.release()
+        return disponibles
+
+    def seleccionar_camara(self, root):
+        camaras = self.listar_camaras()
+        if not camaras:
+            tk.messagebox.showerror("Error", "No se detectaron cámaras.")
+            return False
+        cam_idx = simpledialog.askinteger(
+            "Seleccionar cámara",
+            f"Cámaras detectadas: {camaras}\nIngresa el índice de la cámara a usar:",
+            parent=root,
+            minvalue=min(camaras),
+            maxvalue=max(camaras)
+        )
+        if cam_idx in camaras:
+            self.camera_index = cam_idx
+            return True
+        else:
+            tk.messagebox.showerror("Error", "Índice de cámara inválido.")
+            return False

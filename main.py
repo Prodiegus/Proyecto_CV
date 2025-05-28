@@ -11,10 +11,12 @@ import numpy as np
 from PIL import Image, ImageTk
 import subprocess  
 import os
+import argparse
 
 class App:
-    def __init__(self, root):
+    def __init__(self, root, split=False):
         self.root = root
+        self.split = split
         self.root.title("Sistema de Acceso Empresarial")
         self.root.geometry("900x750")
         self.root.configure(bg="#eaf6fb")
@@ -103,9 +105,18 @@ class App:
         )
         self.info_label.pack(pady=(10, 5))
 
-        # Video label
-        self.video_label = tk.Label(self.root, bg="#222", width=800, height=480)
-        self.video_label.pack(pady=10, fill=tk.BOTH, expand=True)
+        if self.split:
+            self.video_window = tk.Toplevel(self.root)
+            self.video_window.title("Video en Vivo")
+            self.video_window.geometry("820x500")
+            self.video_window.configure(bg="#222")
+            self.video_label = tk.Label(self.video_window, bg="#222", width=800, height=480)
+            self.video_label.pack(pady=10, fill=tk.BOTH, expand=True)
+        else:
+            # Layout clásico: video en la ventana principal
+            self.video_label = tk.Label(self.root, bg="#222", width=800, height=480)
+            self.video_label.pack(pady=10, fill=tk.BOTH, expand=True)
+        
 
     def open_image(self):
         if self.imagen_mostrada is not None:
@@ -157,6 +168,8 @@ class App:
 
     
     def start_camera(self):
+        if not self.camera.seleccionar_camara(self.root):
+            return 
         if self.camera.start_camera():
             self.update_loop()
             messagebox.showinfo("Éxito", "Cámara activada correctamente")
@@ -361,6 +374,9 @@ class App:
     
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-split', action='store_true', help='Divide el panel administrativo de la imagen de la cámara')
+    args = parser.parse_args()
     root = tk.Tk()
-    app = App(root)
+    app = App(root, split=args.split)
     root.mainloop()
